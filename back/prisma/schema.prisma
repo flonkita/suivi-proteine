@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// On ajoute les objectifs possibles
+enum UserGoal {
+  GENERAL_HEALTH     // "Remise en forme / Santé"
+  MUSCLE_GAIN        // "Prise de masse"
+  ATHLETIC           // "Performance athlétique (Ton mode actuel !)"
+}
+
+// Table principale pour le profil utilisateur
+model UserProfile {
+  id           String   @id @default(uuid())
+  startWeight  Float
+  name         String?
+  targetWeight Float
+  targetMonths Int      @default(4) // NOUVEAU : Le temps alloué en mois
+  goal         UserGoal @default(GENERAL_HEALTH) 
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Table principale pour suivre tes journées
+model DailyTracking {
+  id            String   @id @default(uuid())
+  date          DateTime @unique
+  weight        Float?   
+  waterIntake   Int      @default(0) // NOUVEAU : Compteur d'eau en ml (ex: 2000 pour 2L)
+  isTrainingDay Boolean  @default(false) 
+  meals         Meal[]
+  createdAt     DateTime @default(now())
+}
+
+// Table pour les repas
+model Meal {
+  id              String        @id @default(uuid())
+  type            MealType      
+  foodItems       String        
+  calories        Int?          
+  protein         Int?          
+  carbs           Int?          // NOUVEAU : Glucides en grammes
+  fats            Int?          // NOUVEAU : Lipides en grammes
+  isCompliant     Boolean       @default(true) 
+  comment         String?      
+  dailyTrackingId String
+  dailyTracking   DailyTracking @relation(fields: [dailyTrackingId], references: [id])
+  createdAt       DateTime      @default(now())
+}
+
+// Les 4 moments de repas définis par ton protocole
+enum MealType {
+  PETIT_DEJEUNER
+  DEJEUNER
+  COLLATION
+  DINER
+}
+
