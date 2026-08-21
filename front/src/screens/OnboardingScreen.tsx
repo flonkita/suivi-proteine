@@ -21,45 +21,51 @@ interface Props {
 export default function OnboardingScreen({ onComplete }: Props) {
   const [startWeight, setStartWeight] = useState("");
   const [targetWeight, setTargetWeight] = useState("");
+  const [name, setName] = useState("");
   // NOUVEAU : État pour stocker l'objectif sélectionné
   const [goal, setGoal] = useState("GENERAL_HEALTH");
   const [targetMonths, setTargetMonths] = useState("4");
 
-  const handleStartMission = async () => {
-    const start = parseFloat(startWeight);
-    const target = parseFloat(targetWeight);
-    const months = parseInt(targetMonths, 10);
+const handleStartMission = async () => {
+  const start = parseFloat(startWeight);
+  const target = parseFloat(targetWeight);
+  const months = parseInt(targetMonths, 10);
 
-    if (isNaN(start) || isNaN(target)) {
-      Alert.alert("Erreur", "Merci d'entrer des poids valides pour commencer.");
-      return;
+  // NOUVEAU : On s'assure que le prénom n'est pas vide
+  if (!name.trim()) {
+    Alert.alert("Erreur", "N'oublie pas de renseigner ton prénom ou surnom !");
+    return;
+  }
+
+  if (isNaN(start) || isNaN(target)) {
+    Alert.alert("Erreur", "Merci d'entrer des poids valides pour commencer.");
+    return;
+  }
+
+  try {
+    const response = await api.patch("/profile", {
+      name: name.trim(), // NOUVEAU : On expédie enfin le nom au serveur !
+      startWeight: start,
+      targetWeight: target,
+      targetMonths: months,
+      goal: goal,
+    });
+
+    if (response.data.status === "success") {
+      onComplete();
     }
+  } catch (error: any) {
+    console.log(
+      "❌ Détails de l'erreur API :",
+      error.response?.data || error.message,
+    );
 
-    try {
-      const response = await api.patch("/profile", {
-        startWeight: start,
-        targetWeight: target,
-        targetMonths: months,
-        goal: goal, // On envoie l'objectif au back-end
-      });
-
-      if (response.data.status === "success") {
-        onComplete();
-      }
-    } catch (error: any) {
-      // On loggue l'erreur complète dans ton terminal front pour la lire
-      console.log(
-        "❌ Détails de l'erreur API :",
-        error.response?.data || error.message,
-      );
-
-      // On affiche le message du back-end directement sur le téléphone !
-      Alert.alert(
-        "Erreur API",
-        error.response?.data?.message || "Impossible d'initialiser le profil.",
-      );
-    }
-  };
+    Alert.alert(
+      "Erreur API",
+      error.response?.data?.message || "Impossible d'initialiser le profil.",
+    );
+  }
+};
 
   return (
     <SafeAreaView className="flex-1 bg-black">
@@ -93,6 +99,19 @@ export default function OnboardingScreen({ onComplete }: Props) {
             </Text>
           </View>
 
+          <View className="mb-4">
+            <Text className="text-white text-sm font-bold mb-2">
+              Prénom ou Surnom
+            </Text>
+            <TextInput
+              className="bg-[#1e1e1e] border border-gray-800 text-white rounded-xl p-4 text-base"
+              placeholder="Prénom"
+              placeholderTextColor="#71717a"
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
           {/* Section des poids */}
           <View className="bg-neutral-900 p-6 rounded-3xl border border-neutral-800 shadow-xl mb-6">
             <Text className="text-sm font-bold text-neutral-400 mb-2 ml-1">
@@ -100,7 +119,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             </Text>
             <TextInput
               className="bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-4 text-lg font-bold text-white mb-6"
-              placeholder="Ex: 125"
+              placeholder="Poids"
               placeholderTextColor="#666"
               keyboardType="numeric"
               value={startWeight}
@@ -112,7 +131,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             </Text>
             <TextInput
               className="bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-4 text-lg font-bold text-orange-500 mb-2"
-              placeholder="Ex: 95"
+              placeholder="Objectif à atteindre"
               placeholderTextColor="#666"
               keyboardType="numeric"
               value={targetWeight}
@@ -182,11 +201,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
           </View>
 
           <Text className="text-sm font-bold text-neutral-400 mb-2 ml-1">
-            Temps estimé (Mois)
+            Temps estimé
           </Text>
           <TextInput
             className="bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-4 text-lg font-bold text-blue-400 mb-8"
-            placeholder="Ex: 4"
+            placeholder="Deadline à respecter"
             placeholderTextColor="#666"
             keyboardType="numeric"
             value={targetMonths}
@@ -198,7 +217,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
             onPress={handleStartMission}
           >
             <Text className="text-white font-black text-lg">
-              Démarrer le Suivi
+              Démarrer le Suivi !
             </Text>
           </TouchableOpacity>
         </ScrollView>

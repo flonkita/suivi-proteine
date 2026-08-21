@@ -24,7 +24,11 @@
     },
     "android": {
       "package": "com.florent.suiviproteine",
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#171717",
         "foregroundImage": "./assets/icon.png"
@@ -33,6 +37,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "13633693-c110-473e-b962-4f165d1b15e9"
+      }
     }
   }
 }
