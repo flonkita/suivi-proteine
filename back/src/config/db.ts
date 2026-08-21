@@ -2,12 +2,9 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+// NOUVEAU : On utilise directement la DATABASE_URL configurée sur Render !
 const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  database: process.env.DB_NAME,
+  connectionString: process.env.DATABASE_URL,
 });
 
 const adapter = new PrismaPg(pool);
