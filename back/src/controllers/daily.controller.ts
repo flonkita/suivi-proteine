@@ -2,39 +2,55 @@ import type { Request, Response } from "express";
 import prisma from "../config/db.js";
 import { analyzeWeightProgress } from "../services/ai.service.js";
 
+// Fonction utilitaire pour récupérer le profil via le badge du téléphone
+const getProfileFromDevice = async (req: Request, res: Response) => {
+  const deviceId = req.headers["x-device-id"] as string;
+  if (!deviceId) return null;
+  return await prisma.userProfile.findUnique({ where: { deviceId } });
+};
+
 export const getDailySummary = async (req: Request, res: Response) => {
   try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({
+          status: "error",
+          message: "DeviceId manquant ou profil introuvable",
+        });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const dailyRecord = await prisma.dailyTracking.upsert({
-      where: { date: today },
+      where: {
+        date_userProfileId: { date: today, userProfileId: profile.id },
+      },
       update: {},
-      create: { date: today },
+      create: {
+        date: today,
+        userProfileId: profile.id, // Liaison au bon utilisateur !
+      },
       include: { meals: true },
     });
 
-    // 1. Récupération du profil pour les calculs
-    const profile = await prisma.userProfile.findFirst();
-    const weightToUse = dailyRecord.weight || profile?.startWeight || 80;
-    const goal = profile?.goal || "GENERAL_HEALTH";
+    const weightToUse = dailyRecord.weight || profile.startWeight || 80;
+    const goal = profile.goal || "GENERAL_HEALTH";
 
-    // 2. CALCUL DYNAMIQUE DES MACROS CIBLES
     let targetCalories = 2000,
       targetProteins = 150,
       targetFats = 70,
       targetCarbs = 200;
 
     if (goal === "ATHLETIC") {
-      // Ton mode : Déficit calorique pour voler vers l'arceau, protéines massives
       targetCalories = Math.round(weightToUse * 24 - 400);
-      targetProteins = Math.round(weightToUse * 2.2); // 2.2g par kilo
-      targetFats = Math.round(weightToUse * 1.0); // 1g par kilo
+      targetProteins = Math.round(weightToUse * 2.2);
+      targetFats = Math.round(weightToUse * 1.0);
       targetCarbs = Math.round(
         (targetCalories - (targetProteins * 4 + targetFats * 9)) / 4,
       );
     } else if (goal === "MUSCLE_GAIN") {
-      // Prise de masse : Léger surplus
       targetCalories = Math.round(weightToUse * 24 + 300);
       targetProteins = Math.round(weightToUse * 2.0);
       targetFats = Math.round(weightToUse * 1.2);
@@ -42,7 +58,6 @@ export const getDailySummary = async (req: Request, res: Response) => {
         (targetCalories - (targetProteins * 4 + targetFats * 9)) / 4,
       );
     } else {
-      // Santé : Maintien et équilibre
       targetCalories = Math.round(weightToUse * 24);
       targetProteins = Math.round(weightToUse * 1.6);
       targetFats = Math.round(weightToUse * 1.0);
@@ -51,7 +66,6 @@ export const getDailySummary = async (req: Request, res: Response) => {
       );
     }
 
-    // 3. Calcul du total consommé
     const totalCalories = dailyRecord.meals.reduce(
       (sum, meal) => sum + (meal.calories || 0),
       0,
@@ -77,12 +91,13 @@ export const getDailySummary = async (req: Request, res: Response) => {
         isTrainingDay: dailyRecord.isTrainingDay,
         waterIntake: dailyRecord.waterIntake,
         macros: { totalCalories, totalProteins, totalCarbs, totalFats },
-        targets: { targetCalories, targetProteins, targetCarbs, targetFats }, // <-- ON ENVOIE LES CIBLES !
+        targets: { targetCalories, targetProteins, targetCarbs, targetFats },
         mealsCount: dailyRecord.meals.length,
         meals: dailyRecord.meals,
       },
     });
   } catch (error) {
+    console.error("Erreur getDailySummary:", error);
     res
       .status(500)
       .json({
@@ -94,23 +109,32 @@ export const getDailySummary = async (req: Request, res: Response) => {
 
 export const toggleTrainingDay = async (req: Request, res: Response) => {
   try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({ status: "error", message: "Profil introuvable" });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const { isTraining } = req.body;
     if (typeof isTraining !== "boolean") {
-      return res.status(400).json({
-        status: "error",
-        message: "Le champ isTraining doit être un booléen (true ou false).",
-      });
+      return res
+        .status(400)
+        .json({
+          status: "error",
+          message: "Le champ isTraining doit être un booléen.",
+        });
     }
 
     const updatedRecord = await prisma.dailyTracking.upsert({
-      where: { date: today },
+      where: { date_userProfileId: { date: today, userProfileId: profile.id } },
       update: { isTrainingDay: isTraining },
       create: {
         date: today,
         isTrainingDay: isTraining,
+        userProfileId: profile.id,
       },
     });
 
@@ -122,44 +146,52 @@ export const toggleTrainingDay = async (req: Request, res: Response) => {
       data: updatedRecord,
     });
   } catch (error) {
-    console.error(
-      "Erreur lors de la mise à jour du jour d'entraînement:",
-      error,
-    );
-    res.status(500).json({
-      status: "error",
-      message: "Erreur interne lors de la mise à jour du statut.",
-    });
+    console.error("Erreur toggleTrainingDay:", error);
+    res
+      .status(500)
+      .json({
+        status: "error",
+        message: "Erreur interne lors de la mise à jour.",
+      });
   }
 };
 
 export const getDailyHistory = async (req: Request, res: Response) => {
   try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({ status: "error", message: "Profil introuvable" });
+
     const history = await prisma.dailyTracking.findMany({
-      orderBy: {
-        date: "desc",
-      },
-      include: {
-        meals: true,
-      },
+      where: { userProfileId: profile.id }, // <-- TRÈS IMPORTANT : On ne voit que SON historique !
+      orderBy: { date: "desc" },
+      include: { meals: true },
     });
 
-    res.status(200).json({
-      status: "success",
-      count: history.length,
-      data: history,
-    });
+    res
+      .status(200)
+      .json({ status: "success", count: history.length, data: history });
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'historique:", error);
-    res.status(500).json({
-      status: "error",
-      message: "Impossible de récupérer l'historique des journées.",
-    });
+    console.error("Erreur getDailyHistory:", error);
+    res
+      .status(500)
+      .json({
+        status: "error",
+        message: "Impossible de récupérer l'historique.",
+      });
   }
 };
 
 export const updateWeight = async (req: Request, res: Response) => {
   try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({ status: "error", message: "Profil introuvable" });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const { weight } = req.body;
@@ -174,57 +206,59 @@ export const updateWeight = async (req: Request, res: Response) => {
     }
 
     const previousRecord = await prisma.dailyTracking.findFirst({
-      where: { date: { lt: today }, weight: { not: null } },
+      where: {
+        userProfileId: profile.id,
+        date: { lt: today },
+        weight: { not: null },
+      },
       orderBy: { date: "desc" },
     });
 
-    // 1. On récupère le profil pour avoir le poids cible ET le but de l'utilisateur
-    const profile = await prisma.userProfile.findFirst();
-    const targetWeight = profile ? profile.targetWeight : 95.0;
-    const userGoal = profile ? profile.goal : "GENERAL_HEALTH"; // <-- On récupère l'objectif
-    const targetMonths = profile ? profile.targetMonths : 4;
-
-    // 2. On passe l'objectif en 4ème argument à l'IA !
     const aiComment = await analyzeWeightProgress(
       weight,
       previousRecord?.weight || null,
-      targetWeight,
-      userGoal,
-      targetMonths, // <-- On passe le délai en mois à l'IA
+      profile.targetWeight,
+      profile.goal,
+      profile.targetMonths,
     );
 
     const updatedRecord = await prisma.dailyTracking.upsert({
-      where: { date: today },
+      where: { date_userProfileId: { date: today, userProfileId: profile.id } },
       update: { weight: weight },
-      create: { date: today, weight: weight },
+      create: { date: today, weight: weight, userProfileId: profile.id },
     });
 
-    res.status(200).json({
-      status: "success",
-      message: aiComment,
-      data: updatedRecord,
-    });
+    res
+      .status(200)
+      .json({ status: "success", message: aiComment, data: updatedRecord });
   } catch (error) {
-    console.error("Erreur lors de l'enregistrement du poids:", error);
+    console.error("Erreur updateWeight:", error);
     res.status(500).json({ status: "error", message: "Erreur interne." });
   }
 };
 
-// 2. NOUVELLE FONCTION : Ajouter un verre d'eau (250ml)
 export const addWater = async (req: Request, res: Response) => {
   try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({ status: "error", message: "Profil introuvable" });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const updatedRecord = await prisma.dailyTracking.upsert({
-      where: { date: today },
-      update: { waterIntake: { increment: 250 } }, // On ajoute 250ml
-      create: { date: today, waterIntake: 250 },
+      where: { date_userProfileId: { date: today, userProfileId: profile.id } },
+      update: { waterIntake: { increment: 250 } },
+      create: { date: today, waterIntake: 250, userProfileId: profile.id },
     });
 
     res.status(200).json({ status: "success", data: updatedRecord });
   } catch (error) {
-    console.error("Erreur eau:", error);
-    res.status(500).json({ status: "error", message: "Impossible d'ajouter l'eau." });
+    console.error("Erreur addWater:", error);
+    res
+      .status(500)
+      .json({ status: "error", message: "Impossible d'ajouter l'eau." });
   }
 };

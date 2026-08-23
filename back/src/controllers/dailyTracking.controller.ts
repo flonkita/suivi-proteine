@@ -5,14 +5,29 @@ export const createDailyTracking = async (req: Request, res: Response) => {
   try {
     const { weight, isTrainingDay } = req.body;
 
-    // On utilise la date du jour, remise à minuit pour éviter les doublons
+    // 1. Lecture du badge
+    const deviceId = req.headers["x-device-id"] as string;
+    if (!deviceId)
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant" });
+
+    // 2. Recherche du propriétaire
+    const profile = await prisma.userProfile.findUnique({
+      where: { deviceId },
+    });
+    if (!profile)
+      return res
+        .status(404)
+        .json({ status: "error", message: "Profil introuvable" });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // On utilise upsert : met à jour si la journée existe déjà, sinon la crée
+    // 3. Upsert avec la bonne liaison
     const dailyRecord = await prisma.dailyTracking.upsert({
       where: {
-        date: today,
+        date_userProfileId: { date: today, userProfileId: profile.id },
       },
       update: {
         weight,
@@ -22,6 +37,7 @@ export const createDailyTracking = async (req: Request, res: Response) => {
         date: today,
         weight,
         isTrainingDay,
+        userProfileId: profile.id, // <-- Indispensable !
       },
     });
 
