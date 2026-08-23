@@ -13,7 +13,19 @@ const updateGoalSchema = z.object({
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
-    const profile = await prisma.userProfile.findFirst();
+    // On lit le badge du téléphone
+    const deviceId = req.headers["x-device-id"] as string;
+
+    if (!deviceId) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant" });
+    }
+
+    // On cherche UNIQUEMENT le profil lié à ce téléphone
+    const profile = await prisma.userProfile.findUnique({
+      where: { deviceId },
+    });
 
     res.status(200).json({ status: "success", data: profile });
   } catch (error) {
@@ -27,7 +39,14 @@ export const getProfile = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    // TypeScript sait maintenant que parsedData peut contenir "name"
+    const deviceId = req.headers["x-device-id"] as string;
+
+    if (!deviceId) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant" });
+    }
+
     const parsedData = updateGoalSchema.parse(req.body);
 
     const updateData = {
@@ -44,24 +63,19 @@ export const updateProfile = async (req: Request, res: Response) => {
       ...(parsedData.goal !== undefined && { goal: parsedData.goal }),
     };
 
-    let profile = await prisma.userProfile.findFirst();
-
-    if (profile) {
-      profile = await prisma.userProfile.update({
-        where: { id: profile.id },
-        data: updateData,
-      });
-    } else {
-      profile = await prisma.userProfile.create({
-        data: {
-          name: parsedData.name ?? "Athlète", // <--- On ajoute le nom par défaut ici aussi
-          startWeight: parsedData.startWeight ?? 125.0,
-          targetWeight: parsedData.targetWeight ?? 95.0,
-          targetMonths: parsedData.targetMonths ?? 4,
-          goal: parsedData.goal ?? "GENERAL_HEALTH",
-        },
-      });
-    }
+    // Upsert : S'il existe, on met à jour. Sinon, on le crée AVEC le deviceId.
+    const profile = await prisma.userProfile.upsert({
+      where: { deviceId },
+      update: updateData,
+      create: {
+        deviceId,
+        name: parsedData.name ?? "Athlète",
+        startWeight: parsedData.startWeight ?? 125.0,
+        targetWeight: parsedData.targetWeight ?? 95.0,
+        targetMonths: parsedData.targetMonths ?? 4,
+        goal: parsedData.goal ?? "GENERAL_HEALTH",
+      },
+    });
 
     res.status(200).json({ status: "success", data: profile });
   } catch (error) {
@@ -72,11 +86,12 @@ export const updateProfile = async (req: Request, res: Response) => {
         details: error.issues,
       });
     }
-
     console.error("Erreur lors de la mise à jour du profil:", error);
-    res.status(500).json({
-      status: "error",
-      message: "Erreur interne lors de la mise à jour.",
-    });
+    res
+      .status(500)
+      .json({
+        status: "error",
+        message: "Erreur interne lors de la mise à jour.",
+      });
   }
 };

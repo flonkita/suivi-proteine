@@ -14,27 +14,36 @@ enum UserGoal {
   ATHLETIC           // "Performance athlétique (Ton mode actuel !)"
 }
 
-// Table principale pour le profil utilisateur
 model UserProfile {
   id           String   @id @default(uuid())
+  deviceId     String   @unique // NOUVEAU : Le badge unique du téléphone
   startWeight  Float
   name         String?
   targetWeight Float
-  targetMonths Int      @default(4) // NOUVEAU : Le temps alloué en mois
-  goal         UserGoal @default(GENERAL_HEALTH) 
+  targetMonths Int      @default(4)
+  goal         UserGoal @default(GENERAL_HEALTH)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // NOUVEAU : Relation avec ses propres jours de suivi
+  dailyTrackings DailyTracking[]
 }
 
-// Table principale pour suivre tes journées
 model DailyTracking {
   id            String   @id @default(uuid())
-  date          DateTime @unique
-  weight        Float?   
-  waterIntake   Int      @default(0) // NOUVEAU : Compteur d'eau en ml (ex: 2000 pour 2L)
-  isTrainingDay Boolean  @default(false) 
+  date          DateTime
+  weight        Float?
+  waterIntake   Int      @default(0)
+  isTrainingDay Boolean  @default(false)
   meals         Meal[]
   createdAt     DateTime @default(now())
+
+  // NOUVEAU : Lien vers le profil du testeur
+  userProfileId String
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+
+  // NOUVEAU : On empêche les doublons pour UN utilisateur sur UNE date
+  @@unique([date, userProfileId]) 
 }
 
 // Table pour les repas

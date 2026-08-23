@@ -38,10 +38,11 @@ export default function ProfileScreen() {
   const [inputMonths, setInputMonths] = useState(""); // L'état manquant pour les mois !
   const [newWeight, setNewWeight] = useState("");
   const [isSubmittingWeight, setIsSubmittingWeight] = useState(false);
+  const [inputGoal, setInputGoal] = useState(profileData?.goal || "GENERAL_HEALTH");
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   // On agrandit légèrement le panneau pour faire de la place au 3ème champ
-  const snapPoints = useMemo(() => ["60%"], []);
+  const snapPoints = useMemo(() => ["75%"], []);
 
   const fetchProfile = async () => {
     try {
@@ -76,7 +77,8 @@ export default function ProfileScreen() {
   const openBottomSheet = () => {
     setInputStart(String(profileData.startWeight));
     setInputTarget(String(profileData.targetWeight));
-    setInputMonths(String(profileData.targetMonths)); // Reset propre à l'ouverture
+    setInputMonths(String(profileData.targetMonths));
+    setInputGoal(profileData.goal);
     bottomSheetRef.current?.expand();
   };
 
@@ -88,44 +90,46 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSaveGoals = async () => {
-    Keyboard.dismiss();
-    const newStart = parseFloat(inputStart);
-    const newTarget = parseFloat(inputTarget);
-    const newMonths = parseInt(inputMonths, 10); // Conversion du champ mois
+const handleSaveGoals = async () => {
+  Keyboard.dismiss();
+  const newStart = parseFloat(inputStart);
+  const newTarget = parseFloat(inputTarget);
+  const newMonths = parseInt(inputMonths, 10);
 
-    if (isNaN(newStart) || isNaN(newTarget) || isNaN(newMonths)) {
-      Alert.alert("Erreur", "Merci de saisir des valeurs numériques valides.");
-      return;
-    }
+  if (isNaN(newStart) || isNaN(newTarget) || isNaN(newMonths)) {
+    Alert.alert("Erreur", "Merci de saisir des valeurs numériques valides.");
+    return;
+  }
 
-    const previousData = { ...profileData };
+  const previousData = { ...profileData };
 
-    // Mise à jour de l'UI instantanée (Optimistic) avec les mois
-    setProfileData({
-      ...profileData,
+  // Mise à jour de l'UI instantanée (Optimistic) avec les mois ET LE GOAL
+  setProfileData({
+    ...profileData,
+    startWeight: newStart,
+    targetWeight: newTarget,
+    targetMonths: newMonths,
+    goal: inputGoal, // <--- C'EST ICI !
+  });
+
+  bottomSheetRef.current?.close();
+
+  try {
+    // Envoi au back-end (Avec le nouvel objectif !)
+    await api.patch("/profile", {
       startWeight: newStart,
       targetWeight: newTarget,
       targetMonths: newMonths,
+      goal: inputGoal, // <--- ET C'EST ICI !
     });
-
-    bottomSheetRef.current?.close();
-
-    try {
-      // Envoi au back-end
-      await api.patch("/profile", {
-        startWeight: newStart,
-        targetWeight: newTarget,
-        targetMonths: newMonths,
-      });
-    } catch (error) {
-      setProfileData(previousData);
-      Alert.alert(
-        "Erreur réseau",
-        "Impossible de sauvegarder, annulation des modifications.",
-      );
-    }
-  };
+  } catch (error) {
+    setProfileData(previousData);
+    Alert.alert(
+      "Erreur réseau",
+      "Impossible de sauvegarder, annulation des modifications.",
+    );
+  }
+};
 
   const getProfileContent = (goal: string) => {
     switch (goal) {
@@ -419,6 +423,67 @@ export default function ProfileScreen() {
               value={inputMonths}
               onChangeText={setInputMonths}
             />
+
+            {/* Sélecteur d'objectif */}
+            <Text className="text-sm font-bold text-neutral-500 mb-2 ml-1">
+              Objectif principal
+            </Text>
+            <View className="flex-row justify-between gap-2 mb-8">
+              <TouchableOpacity
+                className={`flex-1 py-3 rounded-xl border ${
+                  inputGoal === "GENERAL_HEALTH"
+                    ? "bg-neutral-800 border-neutral-800"
+                    : "bg-neutral-100 border-neutral-200"
+                }`}
+                onPress={() => setInputGoal("GENERAL_HEALTH")}
+              >
+                <Text
+                  className={`text-center font-bold text-xs ${
+                    inputGoal === "GENERAL_HEALTH"
+                      ? "text-white"
+                      : "text-neutral-500"
+                  }`}
+                >
+                  Santé
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`flex-1 py-3 rounded-xl border ${
+                  inputGoal === "MUSCLE_GAIN"
+                    ? "bg-neutral-800 border-neutral-800"
+                    : "bg-neutral-100 border-neutral-200"
+                }`}
+                onPress={() => setInputGoal("MUSCLE_GAIN")}
+              >
+                <Text
+                  className={`text-center font-bold text-xs ${
+                    inputGoal === "MUSCLE_GAIN"
+                      ? "text-white"
+                      : "text-neutral-500"
+                  }`}
+                >
+                  Masse
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className={`flex-1 py-3 rounded-xl border ${
+                  inputGoal === "ATHLETIC"
+                    ? "bg-neutral-800 border-neutral-800"
+                    : "bg-neutral-100 border-neutral-200"
+                }`}
+                onPress={() => setInputGoal("ATHLETIC")}
+              >
+                <Text
+                  className={`text-center font-bold text-xs ${
+                    inputGoal === "ATHLETIC" ? "text-white" : "text-neutral-500"
+                  }`}
+                >
+                  Athlétique
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               className="py-4 rounded-xl items-center shadow-sm"
