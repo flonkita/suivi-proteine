@@ -10,9 +10,27 @@ export const scanGroceryItem = async (req: Request, res: Response) => {
         .json({ status: "error", message: "Aucune photo reçue." });
     }
 
-    // On récupère l'objectif de l'utilisateur pour adapter le jugement
-    const profile = await prisma.userProfile.findFirst();
-    const userGoal = profile?.goal || "GENERAL_HEALTH";
+    // 1. Lecture du badge secret pour le supermarché !
+    const deviceId = req.headers["x-device-id"] as string;
+    if (!deviceId) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant." });
+    }
+
+    // 2. Identification de TON profil
+    const profile = await prisma.userProfile.findUnique({
+      where: { deviceId },
+    });
+
+    if (!profile) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Profil introuvable." });
+    }
+
+    // 3. On utilise TON objectif
+    const userGoal = profile.goal || "GENERAL_HEALTH";
 
     const aiAnalysis = await analyzeGroceryImage(
       req.file.buffer,
@@ -23,11 +41,9 @@ export const scanGroceryItem = async (req: Request, res: Response) => {
     res.status(200).json({ status: "success", data: aiAnalysis });
   } catch (error) {
     console.error("Erreur Grocery Scanner:", error);
-    res
-      .status(500)
-      .json({
-        status: "error",
-        message: "Erreur lors de l'analyse du produit.",
-      });
+    res.status(500).json({
+      status: "error",
+      message: "Erreur lors de l'analyse du produit.",
+    });
   }
 };

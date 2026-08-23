@@ -5,6 +5,22 @@ import { MealType } from "@prisma/client";
 
 export const createMeal = async (req: Request, res: Response) => {
   try {
+    // 1. On lit le badge secret !
+    const deviceId = req.headers["x-device-id"] as string;
+    if (!deviceId)
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant." });
+
+    // 2. On récupère le bon profil (le tien ou celui de ta sœur)
+    const profile = await prisma.userProfile.findUnique({
+      where: { deviceId },
+    });
+    if (!profile)
+      return res
+        .status(404)
+        .json({ status: "error", message: "Profil introuvable." });
+
     const rawType = req.body.type || "REPAS";
     const mealTypeMapper: Record<string, MealType> = {
       "PETIT-DEJ": "PETIT_DEJEUNER",
@@ -24,18 +40,16 @@ export const createMeal = async (req: Request, res: Response) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. On récupère la journée
+    // 3. On récupère ou on crée la journée en la liant à ton profil
     const dailyRecord = await prisma.dailyTracking.upsert({
-      where: { date: today },
+      where: { date_userProfileId: { date: today, userProfileId: profile.id } },
       update: {},
-      create: { date: today },
+      create: { date: today, userProfileId: profile.id },
     });
 
-    // 2. On récupère le profil pour connaître l'objectif (ATHLETIC, MUSCLE_GAIN, GENERAL_HEALTH)
-    const profile = await prisma.userProfile.findFirst();
-    const userGoal = profile?.goal || "GENERAL_HEALTH";
+    const userGoal = profile.goal || "GENERAL_HEALTH";
 
-    // 3. On envoie tout à l'IA
+    // 4. On envoie tout à l'IA
     const aiAnalysis = await analyzeMealImage(
       req.file.buffer,
       req.file.mimetype,
@@ -45,15 +59,15 @@ export const createMeal = async (req: Request, res: Response) => {
       userGoal,
     );
 
-    // 4. On sauvegarde toutes les macros dans la table Meal !
+    // 5. On sauvegarde les macros
     const newMeal = await prisma.meal.create({
       data: {
         type: prismaMealType,
         foodItems: aiAnalysis.name,
         calories: aiAnalysis.calories,
         protein: aiAnalysis.proteins,
-        carbs: aiAnalysis.carbs, // <-- NOUVEAU
-        fats: aiAnalysis.fats, // <-- NOUVEAU
+        carbs: aiAnalysis.carbs,
+        fats: aiAnalysis.fats,
         isCompliant: aiAnalysis.isValid,
         dailyTrackingId: dailyRecord.id,
         comment: aiAnalysis.comment,
@@ -71,17 +85,12 @@ export const deleteMeal = async (req: Request, res: Response) => {
   try {
     const mealId = req.params.id;
     if (typeof mealId !== "string") {
-      return res.status(400).json({
-        status: "error",
-        message: "ID de repas invalide.",
-      });
+      return res
+        .status(400)
+        .json({ status: "error", message: "ID de repas invalide." });
     }
 
-    await prisma.meal.delete({
-      where: {
-        id: mealId,
-      },
-    });
+    await prisma.meal.delete({ where: { id: mealId } });
 
     res.status(200).json({
       status: "success",
