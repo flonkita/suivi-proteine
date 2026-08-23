@@ -9,16 +9,14 @@ export const analyzeMealImage = async (
   mealType: string,
   isTrainingDay: boolean,
   userDescription: string,
-  userGoal: string, // <-- NOUVEAU : On récupère l'objectif de l'utilisateur
+  userGoal: string,
 ) => {
   const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
-  // 1. DÉFINITION DYNAMIQUE DU COACH ET DES RÈGLES
   let coachPersona = "";
   let nutritionRules = "";
 
   if (userGoal === "ATHLETIC") {
-    // TON MODE : La charte stricte pour l'explosivité
     coachPersona =
       "Tu es un préparateur physique intraitable. Ton athlète veut perdre du poids et s'entraîner intensément pour améliorer sa détente verticale.";
     nutritionRules = `
@@ -35,19 +33,16 @@ export const analyzeMealImage = async (
       RÈGLE D'ENTRAÎNEMENT : ${isTrainingDay ? "Aujourd'hui est un jour d'entraînement. Riz blanc et patate douce tolérés." : "Jour de repos. Déficit strict, collations riches interdites."}
     `;
   } else if (userGoal === "MUSCLE_GAIN") {
-    // Mode Go-Muscu
     coachPersona = "Tu es un coach expert en hypertrophie musculaire.";
     nutritionRules =
       "L'objectif est un surplus calorique propre. Valorise les apports massifs en protéines et en glucides complexes autour des entraînements. Aucune interdiction stricte d'aliments sains.";
   } else {
-    // Mode Santé (Grand Public)
     coachPersona =
       "Tu es un nutritionniste bienveillant axé sur le bien-être et la santé globale.";
     nutritionRules =
       "L'objectif est l'équilibre alimentaire. Valorise la diversité des macronutriments, les légumes et la modération. Ne sois pas punitif.";
   }
 
-  // 2. ASSEMBLAGE DU PROMPT UNIQUE
   const promptComplet = `
     ${coachPersona}
     
@@ -84,7 +79,7 @@ export const analyzeWeightProgress = async (
   previousWeight: number | null,
   targetWeight: number,
   userGoal: string,
-  targetMonths: number, // <-- On reçoit le délai
+  targetMonths: number,
 ) => {
   const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
@@ -121,7 +116,7 @@ export const analyzeGroceryImage = async (
       L'utilisateur suit une Diète PRÉDATEUR stricte pour des performances athlétiques et une perte de poids massive.
       - ALIMENTS BRUTS AUTORISÉS : Viandes (poulet, bœuf 5%), poissons, œufs, légumes verts, fruits.
       - TOLÉRANCES : Zéro-sucre (type cola), épices sèches.
-      - INTERDICTIONS ABSOLUES : Sucre ajouté, huiles végétales, aliments ultra-transformés. (Rappel : les oignons sont bannis de cette charte spécifique !).
+      - INTERDICTIONS ABSOLUES : Sucre ajouté, huiles végétales, aliments ultra-transformés, légumes non fermentés.
     `;
   } else if (userGoal === "MUSCLE_GAIN") {
     rules =
@@ -141,7 +136,7 @@ export const analyzeGroceryImage = async (
     - "productName": Le nom de l'aliment repéré.
     - "isProcessed": true si c'est un produit transformé, false si c'est un produit brut (fruit, légume, viande crue).
     - "verdict": "VALIDE", "MODERATION", ou "INTERDIT".
-    - "explanation": 2 phrases maximum, percutantes et directes, pour justifier le verdict selon les règles du profil. Si tu vois une liste d'ingrédients avec des éléments interdits, cite-les.
+    - "explanation": 2 phrases maximum, percutantes et directes, pour justify le verdict selon les règles du profil. Si tu vois une liste d'ingrédients avec des éléments interdits, cite-les.
   `;
 
   const imagePart = {
@@ -159,9 +154,8 @@ export const analyzeGroceryImage = async (
 export const generateBudgetRecipe = async (
   userGoal: string,
   mealType: string,
-  isTrainingDay: boolean, // NOUVEAU PARAMÈTRE
+  isTrainingDay: boolean,
 ) => {
-  // NOUVEAU : On monte la température à 0.9 pour forcer la diversité et la créativité !
   const model = genAI.getGenerativeModel({
     model: "gemini-3.5-flash-lite",
     generationConfig: { temperature: 0.9 },
@@ -169,12 +163,18 @@ export const generateBudgetRecipe = async (
 
   let nutritionRules = "";
   if (userGoal === "ATHLETIC") {
-    nutritionRules = `Diète PRÉDATEUR stricte. Zéro oignon (bannis-les absolument), zéro sucre, zéro huile végétale. Protéines pures.`;
+    // Le chef sait que "légume non fermenté" inclut l'oignon de base, on garde ça concis.
+    nutritionRules = `Diète PRÉDATEUR stricte. Zéro sucre, zéro huile végétale. Aucun légume non fermenté. Protéines pures.`;
   } else if (userGoal === "MUSCLE_GAIN") {
     nutritionRules = `Prise de masse propre avec léger surplus calorique.`;
   } else {
     nutritionRules = `Santé et équilibre.`;
   }
+
+  const isBreakfast = mealType.toLowerCase().includes("petit");
+  const breakfastOverride = isBreakfast
+    ? "⚠️ INTERDICTION FORMELLE d'utiliser de la viande (bœuf, poulet, dinde, etc.) pour ce repas. Utilise UNIQUEMENT des œufs, du fromage blanc, du skyr ou de la whey pour les protéines."
+    : "";
 
   const trainingContext = isTrainingDay
     ? "Aujourd'hui est un JOUR D'ENTRAÎNEMENT 🏀. Le repas doit fournir de l'énergie, être massif et hyper-protéiné pour la récupération (type 'Athlete's Dinner')."
@@ -187,12 +187,13 @@ export const generateBudgetRecipe = async (
     Repas demandé : "${mealType}".
     Profil : ${nutritionRules}.
     Contexte physique : ${trainingContext}
+    ${breakfastOverride}
     
     RÈGLES ABSOLUES POUR FORCER LA DIVERSITÉ ET LE STYLE :
     1. CONCEPTS & SAUCES : Alterne entre "Fakeaways" (Nuggets croustillants au Air Fryer, Wraps, Tacos Bowls), plats de "Flemme étudiante" (Thon/Fromage blanc, Haricots verts/Pilons), et des repas de récupération massifs (ex: Pommes de terre sautées + Viande hachée + Œufs). N'hésite pas à proposer des sauces maison (fromage blanc/moutarde/sriracha).
     2. LES ŒUFS (RÈGLE D'OR) : Le client mange TOUJOURS ses œufs ENTIERS. Ne propose JAMAIS de jeter les jaunes ou d'utiliser des blancs d'œufs en bouteille ! Tout est bon dans l'œuf.
     3. VARIE LES PROTÉINES : Utilise du Poulet, de la Dinde, du Thon, des Œufs, du Bœuf haché. (Ne fais pas toujours des "Smash Burgers" !).
-    4. PETIT-DÉJEUNER : Reste sur du classique matinal (œufs entiers, avoine, fromage blanc), pas de plats lourds type burger ou viande rouge.
+    4. PETIT-DÉJEUNER : Reste sur du classique matinal (œufs entiers, avoine, fromage blanc).
     5. BUDGET : Calcule un prix réaliste PAR PORTION (entre 1.50€ et 4.00€ maximum).
     
     Renvoie UNIQUEMENT un JSON avec :
