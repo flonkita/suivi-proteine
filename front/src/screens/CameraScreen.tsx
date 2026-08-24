@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
@@ -18,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
 import { StatusBar } from "expo-status-bar";
+import CustomAlert from "../components/CustomAlert";
 
 const MEAL_TYPES = ["PETIT-DEJ", "DEJEUNER", "COLLATION", "DINER"];
 
@@ -34,19 +34,28 @@ export default function CameraScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // NOUVEAU : Le state pour gérer le mode de scan
   const [scanMode, setScanMode] = useState<"MEAL" | "GROCERY">("MEAL");
 
-  // States pour le mode REPAS
   const [selectedType, setSelectedType] = useState("DEJEUNER");
   const [description, setDescription] = useState("");
 
-  // State pour le mode COURSES
   const [groceryResult, setGroceryResult] = useState<GroceryResult | null>(
     null,
   );
 
   const cameraRef = useRef<any>(null);
+
+  // --- NOUVEAUX ÉTATS POUR LE CUSTOM ALERT ---
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  // -------------------------------------------
 
   if (!permission) {
     return <View className="flex-1 bg-black" />;
@@ -66,7 +75,7 @@ export default function CameraScreen() {
               onPress={requestPermission}
             >
               <Text className="text-white font-bold text-base">
-                Autoriser la caméra
+                Autoriser la cam
               </Text>
             </TouchableOpacity>
           </View>
@@ -88,6 +97,7 @@ export default function CameraScreen() {
     if (!photoUri) return;
 
     setLoading(true);
+
     try {
       const formData = new FormData();
       formData.append("image", {
@@ -108,7 +118,8 @@ export default function CameraScreen() {
         });
 
         if (response.data.status === "success") {
-          Alert.alert("Coach IA :", response.data.data.comment);
+          // Utilisation du CustomAlert !
+          showAlert("Coach IA :", response.data.data.comment);
           resetScanner();
         }
       } else {
@@ -123,7 +134,8 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error("Erreur d'analyse :", error);
-      Alert.alert("Erreur", "Le coach n'a pas pu analyser cette image.");
+      // Utilisation du CustomAlert !
+      showAlert("Erreur", "Le coach n'a pas pu analyser cette image.");
     } finally {
       setLoading(false);
     }
@@ -151,6 +163,7 @@ export default function CameraScreen() {
   return (
     <SafeAreaView className="flex-1 bg-black" edges={["top"]}>
       <StatusBar style="light" />
+
       <View className="flex-1 bg-black">
         {photoUri ? (
           <>
@@ -192,6 +205,7 @@ export default function CameraScreen() {
                   <Text className="text-neutral-600 text-base text-center leading-6 mb-6">
                     {groceryResult.explanation}
                   </Text>
+
                   <TouchableOpacity
                     className="bg-neutral-800 w-full py-4 rounded-xl items-center flex-row justify-center shadow-sm"
                     onPress={resetScanner}
@@ -225,8 +239,8 @@ export default function CameraScreen() {
                         />
                         <Text className="text-white text-center mt-4 text-base font-medium px-4 leading-6">
                           {scanMode === "MEAL"
-                            ? "L'IA juge ton assiette...\n(Le 1er scan peut prendre 50s, le serveur s'échauffe ! 🏋️‍♂️)"
-                            : "Analyse du produit en cours...\n(Le 1er scan peut prendre 50s, le serveur s'échauffe ! 🏋️‍♂️)"}
+                            ? "L'IA juge ton assiette...\n(Le 1er scan peut prendre 50s, le serveur s'échauffe !)"
+                            : "Analyse du produit en cours...\n(Le 1er scan peut prendre 50s, le serveur s'échauffe !)"}
                         </Text>
                       </View>
                     ) : (
@@ -236,6 +250,7 @@ export default function CameraScreen() {
                             <Text className="text-neutral-400 text-center text-sm mb-4">
                               Quel est ce repas ?
                             </Text>
+
                             <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={false}
@@ -275,7 +290,7 @@ export default function CameraScreen() {
                           </>
                         ) : (
                           <Text className="text-white text-center text-base font-bold mb-6 mt-2">
-                            🛒 Prêt à analyser ce produit ?
+                            Prêt à analyser ce produit ?
                           </Text>
                         )}
 
@@ -288,7 +303,6 @@ export default function CameraScreen() {
                               Reprendre
                             </Text>
                           </TouchableOpacity>
-
                           <TouchableOpacity
                             className={`py-3.5 px-4 rounded-xl flex-[0.47] items-center justify-center ${scanMode === "MEAL" ? "bg-orange-500" : "bg-blue-500"}`}
                             onPress={uploadPhoto}
@@ -331,7 +345,6 @@ export default function CameraScreen() {
                   Repas
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 className={`px-5 py-2.5 rounded-full flex-row items-center ${scanMode === "GROCERY" ? "bg-blue-500" : ""}`}
                 onPress={() => setScanMode("GROCERY")}
@@ -361,6 +374,12 @@ export default function CameraScreen() {
           </View>
         )}
       </View>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }

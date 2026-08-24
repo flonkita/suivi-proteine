@@ -3,7 +3,6 @@ import {
   Text,
   ActivityIndicator,
   TouchableOpacity,
-  Alert,
   Switch,
   ScrollView,
 } from "react-native";
@@ -13,6 +12,8 @@ import api from "../services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import CustomAlert from "../components/CustomAlert";
+import CustomDeleteAlert from "../components/CustomDeleteAlert"; // Composant spécifique, voir plus bas
 
 interface Meal {
   id: string;
@@ -36,7 +37,6 @@ interface DailySummary {
     totalFats: number;
   };
   targets: {
-    // <-- ON DÉCLARE LES CIBLES
     targetCalories: number;
     targetProteins: number;
     targetCarbs: number;
@@ -52,9 +52,25 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [userName, setUserName] = useState<string>("");
 
+  // --- NOUVEAUX ÉTATS POUR LE CUSTOM ALERT ---
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  // -------------------------------------------
+
+  // --- NOUVEAUX ÉTATS POUR LA SUPPRESSION ---
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const [mealToDelete, setMealToDelete] = useState<string | null>(null);
+  // ------------------------------------------
+
   const fetchDailySummary = async () => {
     try {
-      // On lance les deux requêtes en parallèle pour aller plus vite
       const [summaryRes, profileRes] = await Promise.all([
         api.get("/daily/summary"),
         api.get("/profile"),
@@ -64,7 +80,7 @@ export default function DashboardScreen() {
         setSummary(summaryRes.data.data);
       }
       if (profileRes.data.status === "success" && profileRes.data.data?.name) {
-        setUserName(profileRes.data.data.name); // <-- ON RÉCUPÈRE LE NOM
+        setUserName(profileRes.data.data.name);
       }
     } catch (error) {
       console.error("Erreur lors de la récupération des données :", error);
@@ -81,11 +97,12 @@ export default function DashboardScreen() {
 
   const handleToggleTraining = async (value: boolean) => {
     setSummary((prev) => (prev ? { ...prev, isTrainingDay: value } : null));
+
     try {
       await api.patch("/daily/training", { isTraining: value });
     } catch (error) {
       setSummary((prev) => (prev ? { ...prev, isTrainingDay: !value } : null));
-      Alert.alert("Erreur", "Impossible de changer le mode d'entraînement.");
+      showAlert("Erreur", "Impossible de changer le mode d'entraînement.");
     }
   };
 
@@ -93,36 +110,40 @@ export default function DashboardScreen() {
     setSummary((prev) =>
       prev ? { ...prev, waterIntake: (prev.waterIntake || 0) + 250 } : null,
     );
+
     try {
       await api.patch("/daily/water");
     } catch (error) {
       setSummary((prev) =>
         prev ? { ...prev, waterIntake: (prev.waterIntake || 0) - 250 } : null,
       );
-      Alert.alert("Erreur", "Impossible d'ajouter l'eau.");
+      showAlert("Erreur", "Impossible d'ajouter l'eau.");
     }
   };
 
-  const handleDeleteMeal = (mealId: string) => {
-    Alert.alert(
-      "Supprimer le repas",
-      "Es-tu sûr de vouloir jeter cette assiette à la poubelle ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.delete(`/meals/${mealId}`);
-              fetchDailySummary(); // On recharge pour mettre à jour les jauges
-            } catch (error) {
-              Alert.alert("Erreur", "Impossible de supprimer ce repas.");
-            }
-          },
-        },
-      ],
-    );
+  // Nouvelle logique de suppression
+  const triggerDeleteAlert = (mealId: string) => {
+    setMealToDelete(mealId);
+    setDeleteAlertVisible(true);
+  };
+
+  const confirmDeleteMeal = async () => {
+    if (!mealToDelete) return;
+    setDeleteAlertVisible(false);
+
+    try {
+      await api.delete(`/meals/${mealToDelete}`);
+      fetchDailySummary();
+    } catch (error) {
+      showAlert("Erreur", "Impossible de supprimer ce repas.");
+    } finally {
+      setMealToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteAlertVisible(false);
+    setMealToDelete(null);
   };
 
   const formatMealType = (type: string) => {
@@ -145,11 +166,12 @@ export default function DashboardScreen() {
         <Text className="font-bold text-base text-neutral-800">
           {formatMealType(item.type)}
         </Text>
-        <TouchableOpacity onPress={() => handleDeleteMeal(item.id)}>
-          <Text className="text-lg">🗑️</Text>
+        <TouchableOpacity onPress={() => triggerDeleteAlert(item.id)}>
+          <Text className="text-lg">❌</Text>
         </TouchableOpacity>
       </View>
       <Text className="text-sm text-neutral-500 mb-2">{item.foodItems}</Text>
+
       <View className="flex-row gap-3 mb-2">
         <Text className="font-bold text-neutral-700">
           🔥 {Number(item.calories || 0)} kcal
@@ -164,6 +186,7 @@ export default function DashboardScreen() {
           🥑 {Number(item.fats || 0)}g
         </Text>
       </View>
+
       <Text
         className="italic text-sm mt-1"
         style={{ color: item.isCompliant ? "#2E8B57" : "#B22222" }}
@@ -189,7 +212,6 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-100" edges={["top"]}>
       <StatusBar style="dark" />
-
       <ScrollView
         className="flex-1 bg-neutral-100 pt-2"
         showsVerticalScrollIndicator={false}
@@ -209,7 +231,7 @@ export default function DashboardScreen() {
         <View className="flex-row items-center justify-between mx-4 bg-white shadow-sm elevation-md p-4 rounded-2xl mb-4">
           <Text className="text-base font-bold text-neutral-800">
             {summary.isTrainingDay
-              ? "🏀 Jour d'entraînement"
+              ? "🏋️ Jour d'entraînement"
               : "🛋️ Jour de repos"}
           </Text>
           <Switch
@@ -348,7 +370,6 @@ export default function DashboardScreen() {
         <Text className="text-lg font-bold mx-4 mb-3 text-neutral-600">
           Historique des assiettes ({summary.mealsCount})
         </Text>
-
         <View className="px-4 pb-8">
           {summary.meals && summary.meals.length > 0 ? (
             summary.meals.map((item) => renderMeal({ item }))
@@ -359,6 +380,19 @@ export default function DashboardScreen() {
           )}
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
+
+      <CustomDeleteAlert
+        visible={deleteAlertVisible}
+        onCancel={cancelDelete}
+        onConfirm={confirmDeleteMeal}
+      />
     </SafeAreaView>
   );
 }

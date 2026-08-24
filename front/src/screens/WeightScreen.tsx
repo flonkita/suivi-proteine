@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -14,17 +13,29 @@ import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import CustomAlert from "../components/CustomAlert";
 
 export default function WeightScreen() {
   const [weightInput, setWeightInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
-
   const [startWeight, setStartWeight] = useState(125.0);
   const [targetWeight, setTargetWeight] = useState(95.0);
   const [weightHistory, setWeightHistory] = useState<
     { weight: number; label: string }[]
   >([]);
+
+  // --- NOUVEAUX ÉTATS POUR LE CUSTOM ALERT ---
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  // -------------------------------------------
 
   const fetchWeightData = async () => {
     try {
@@ -48,13 +59,11 @@ export default function WeightScreen() {
         const weightsOnly = historyRes.data.data.filter(
           (d: any) => d.weight !== null,
         );
-
         if (weightsOnly.length > 0) {
           const formatted = weightsOnly
             .map((d: any) => {
               const date = new Date(d.date);
               const isToday = new Date().toDateString() === date.toDateString();
-
               return {
                 weight: d.weight,
                 label: isToday
@@ -63,7 +72,6 @@ export default function WeightScreen() {
               };
             })
             .reverse();
-
           setWeightHistory(formatted);
         } else {
           setWeightHistory([{ weight: currentStartWeight, label: "Début" }]);
@@ -98,21 +106,19 @@ export default function WeightScreen() {
   const handleSaveWeight = async () => {
     const val = parseFloat(weightInput);
     if (isNaN(val)) {
-      Alert.alert("Erreur", "Entre un poids valide (ex: 92.8)");
+      showAlert("Erreur", "Entre un poids valide (ex: 92.8)");
       return;
     }
 
     try {
       const response = await api.patch("/daily/weight", { weight: val });
-
       if (response.data.message) {
         setAiMessage(response.data.message);
       }
-
       setWeightInput("");
       fetchWeightData();
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de sauvegarder ce poids.");
+      showAlert("Erreur", "Impossible de sauvegarder ce poids.");
     }
   };
 
@@ -130,10 +136,10 @@ export default function WeightScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-100" edges={["top"]}>
       <StatusBar style="dark" />
-
       <KeyboardAvoidingView
         className="flex-1 bg-neutral-100"
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
           className="flex-1 px-4 pt-4"
@@ -161,7 +167,6 @@ export default function WeightScreen() {
             <Text className="text-sm text-neutral-500 mb-4 italic">
               En route vers le dunk et l'explosivité sur les parquets !
             </Text>
-
             <View className="h-3.5 bg-neutral-100 rounded-full overflow-hidden mb-2">
               <View
                 className="h-full bg-orange-500 rounded-full"
@@ -184,7 +189,7 @@ export default function WeightScreen() {
           {/* HISTORIQUE VISUEL DES RELEVÉS */}
           <View className="bg-white p-5 rounded-2xl mb-4 shadow-sm elevation-md">
             <Text className="text-base font-bold text-neutral-800 mb-4">
-              Évolution
+              📈 Évolution
             </Text>
             <View className="pl-1 py-1">
               {weightHistory.map((item, index) => (
@@ -195,6 +200,7 @@ export default function WeightScreen() {
                       <View className="w-0.5 h-8 bg-orange-200 mt-1" />
                     )}
                   </View>
+
                   <View className="flex-row justify-between flex-1 bg-neutral-50 p-2 rounded-lg border border-neutral-100">
                     <Text className="font-bold text-base text-neutral-800">
                       {item.weight} kg
@@ -234,6 +240,13 @@ export default function WeightScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -5,7 +5,6 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
-  Alert,
   Keyboard,
   TextInput,
 } from "react-native";
@@ -19,10 +18,10 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import api from "../services/api";
 import { StatusBar } from "expo-status-bar";
+import CustomAlert from "../components/CustomAlert";
 
 export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
-
   const [profileData, setProfileData] = useState({
     name: "",
     startWeight: 125,
@@ -32,17 +31,30 @@ export default function ProfileScreen() {
     goal: "GENERAL_HEALTH",
   });
 
-  // États locaux pour le formulaire de la Bottom Sheet
   const [inputStart, setInputStart] = useState("");
   const [inputTarget, setInputTarget] = useState("");
-  const [inputMonths, setInputMonths] = useState(""); // L'état manquant pour les mois !
+  const [inputMonths, setInputMonths] = useState("");
   const [newWeight, setNewWeight] = useState("");
   const [isSubmittingWeight, setIsSubmittingWeight] = useState(false);
-  const [inputGoal, setInputGoal] = useState(profileData?.goal || "GENERAL_HEALTH");
+  const [inputGoal, setInputGoal] = useState(
+    profileData?.goal || "GENERAL_HEALTH",
+  );
 
   const bottomSheetRef = useRef<BottomSheet>(null);
-  // On agrandit légèrement le panneau pour faire de la place au 3ème champ
+
   const snapPoints = useMemo(() => ["75%"], []);
+
+  // --- NOUVEAUX ÉTATS POUR LE CUSTOM ALERT ---
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  // -------------------------------------------
 
   const fetchProfile = async () => {
     try {
@@ -57,9 +69,10 @@ export default function ProfileScreen() {
           targetMonths: data.targetMonths || 4,
           goal: data.goal || "GENERAL_HEALTH",
         });
+
         setInputStart(String(data.startWeight || 125));
         setInputTarget(String(data.targetWeight || 95));
-        setInputMonths(String(data.targetMonths || 4)); // Initialisation du champ
+        setInputMonths(String(data.targetMonths || 4));
       }
     } catch (error) {
       console.error("Erreur lors de la récupération du profil:", error);
@@ -90,46 +103,44 @@ export default function ProfileScreen() {
     }
   };
 
-const handleSaveGoals = async () => {
-  Keyboard.dismiss();
-  const newStart = parseFloat(inputStart);
-  const newTarget = parseFloat(inputTarget);
-  const newMonths = parseInt(inputMonths, 10);
+  const handleSaveGoals = async () => {
+    Keyboard.dismiss();
+    const newStart = parseFloat(inputStart);
+    const newTarget = parseFloat(inputTarget);
+    const newMonths = parseInt(inputMonths, 10);
 
-  if (isNaN(newStart) || isNaN(newTarget) || isNaN(newMonths)) {
-    Alert.alert("Erreur", "Merci de saisir des valeurs numériques valides.");
-    return;
-  }
+    if (isNaN(newStart) || isNaN(newTarget) || isNaN(newMonths)) {
+      showAlert("Erreur", "Merci de saisir des valeurs numériques valides.");
+      return;
+    }
 
-  const previousData = { ...profileData };
+    const previousData = { ...profileData };
 
-  // Mise à jour de l'UI instantanée (Optimistic) avec les mois ET LE GOAL
-  setProfileData({
-    ...profileData,
-    startWeight: newStart,
-    targetWeight: newTarget,
-    targetMonths: newMonths,
-    goal: inputGoal, // <--- C'EST ICI !
-  });
-
-  bottomSheetRef.current?.close();
-
-  try {
-    // Envoi au back-end (Avec le nouvel objectif !)
-    await api.patch("/profile", {
+    setProfileData({
+      ...profileData,
       startWeight: newStart,
       targetWeight: newTarget,
       targetMonths: newMonths,
-      goal: inputGoal, // <--- ET C'EST ICI !
+      goal: inputGoal,
     });
-  } catch (error) {
-    setProfileData(previousData);
-    Alert.alert(
-      "Erreur réseau",
-      "Impossible de sauvegarder, annulation des modifications.",
-    );
-  }
-};
+
+    bottomSheetRef.current?.close();
+
+    try {
+      await api.patch("/profile", {
+        startWeight: newStart,
+        targetWeight: newTarget,
+        targetMonths: newMonths,
+        goal: inputGoal,
+      });
+    } catch (error) {
+      setProfileData(previousData);
+      showAlert(
+        "Erreur réseau",
+        "Impossible de sauvegarder, annulation des modifications.",
+      );
+    }
+  };
 
   const getProfileContent = (goal: string) => {
     switch (goal) {
@@ -140,7 +151,7 @@ const handleSaveGoals = async () => {
           color: "#FF4500",
           dietTitle: "La Diète Prédateur",
           dietDesc:
-            "Haute teneur en protéines pour la récupération musculaire. Exclusion absolue des oignons et respect strict de la charte pour des résultats massifs.",
+            "Haute teneur en protéines pour la réparation musculaire. Exclusion absolue des oignons et respect strict de la charte pour des résultats massifs.",
           activityTitle: "Profil Terrain",
           activityDesc:
             "Entraînement axé sur l'explosivité et la verticalité pour aller chercher les meilleures capacités physiques.",
@@ -189,24 +200,22 @@ const handleSaveGoals = async () => {
     Keyboard.dismiss();
     const weightValue = parseFloat(newWeight);
     if (isNaN(weightValue)) {
-      Alert.alert("Erreur", "Saisis un poids valide.");
+      showAlert("Erreur", "Saisis un poids valide.");
       return;
     }
 
     setIsSubmittingWeight(true);
     try {
-      // On envoie le poids vers la route daily existante
       await api.patch("/daily/weight", { weight: weightValue });
-
-      Alert.alert(
+      showAlert(
         "Succès",
         "Poids enregistré ! Le coach a mis à jour ton suivi.",
       );
       setNewWeight("");
-      fetchProfile(); // Rafraîchit les données du profil
+      fetchProfile();
     } catch (error) {
       console.error("Erreur poids:", error);
-      Alert.alert("Erreur", "Impossible d'enregistrer le poids.");
+      showAlert("Erreur", "Impossible d'enregistrer le poids.");
     } finally {
       setIsSubmittingWeight(false);
     }
@@ -215,11 +224,11 @@ const handleSaveGoals = async () => {
   return (
     <GestureHandlerRootView className="flex-1">
       <StatusBar style="dark" />
-
       <SafeAreaView className="flex-1 bg-neutral-100" edges={["top"]}>
         <ScrollView
           className="flex-1 px-4 pt-4"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled" // Ajouté pour éviter que le scroll ne soit bloqué par le clavier
         >
           <View className="items-center mb-8 mt-4">
             <View
@@ -279,11 +288,10 @@ const handleSaveGoals = async () => {
             </TouchableOpacity>
           </View>
 
-          {/* SECTION MENSURATIONS (La suite de ton code existant...) */}
+          {/* SECTION MENSURATIONS */}
           <Text className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3 ml-1">
             Mes Objectifs
           </Text>
-
           <View className="bg-white rounded-2xl p-5 mb-6 shadow-sm elevation-md">
             <View className="flex-row justify-between items-center mb-4 pb-4 border-b border-neutral-100">
               <View className="flex-row items-center">
@@ -355,7 +363,6 @@ const handleSaveGoals = async () => {
                 {content.dietDesc}
               </Text>
             </View>
-
             <View className="pt-4 border-t border-neutral-100">
               <View className="flex-row items-center mb-2">
                 <Ionicons name="fitness" size={22} color={content.color} />
@@ -497,6 +504,13 @@ const handleSaveGoals = async () => {
           </BottomSheetView>
         </BottomSheet>
       </SafeAreaView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </GestureHandlerRootView>
   );
 }
