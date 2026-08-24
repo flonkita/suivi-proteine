@@ -22,7 +22,7 @@ model UserProfile {
   targetWeight Float
   targetMonths Int      @default(4)
   goal         UserGoal @default(GENERAL_HEALTH)
-  isPremium    Boolean  @default(true) // NOUVEAU : On peut gérer les comptes premium pour les tests
+  isPremium    Boolean  @default(false) // NOUVEAU : On peut gérer les comptes premium pour les tests
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
