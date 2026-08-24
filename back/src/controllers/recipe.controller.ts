@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-import { generateBudgetRecipe } from "../services/ai.service.js";
+import { analyzeFridgeAndGenerateRecipe, generateBudgetRecipe } from "../services/ai.service.js";
+import { getProfileFromDevice } from "./daily.controller.js";
 import prisma from "../config/db.js";
 
 export const getRecipe = async (req: Request, res: Response) => {
@@ -45,5 +46,38 @@ export const getRecipe = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ status: "error", message: "Le chef a brûlé le plat." });
+  }
+};
+
+export const scanFridgeHandler = async (req: Request, res: Response) => {
+  try {
+    const profile = await getProfileFromDevice(req, res);
+    if (!profile)
+      return res
+        .status(400)
+        .json({ status: "error", message: "Profil introuvable" });
+
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Aucune photo fournie." });
+    }
+
+    const { mealType = "Dîner", isTrainingDay = false } = req.body;
+
+    const result = await analyzeFridgeAndGenerateRecipe(
+      req.file.buffer,
+      req.file.mimetype,
+      profile.goal,
+      mealType,
+      isTrainingDay === "true" || isTrainingDay === true,
+    );
+
+    res.status(200).json({ status: "success", data: result });
+  } catch (error) {
+    console.error("Erreur fridge scan:", error);
+    res
+      .status(500)
+      .json({ status: "error", message: "Échec de l'analyse du frigo." });
   }
 };

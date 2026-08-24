@@ -206,12 +206,25 @@ export default function ProfileScreen() {
 
     setIsSubmittingWeight(true);
     try {
-      await api.patch("/daily/weight", { weight: weightValue });
-      showAlert(
-        "Succès",
-        "Poids enregistré ! Le coach a mis à jour ton suivi.",
-      );
+      const response = await api.patch("/daily/weight", {
+        weight: weightValue,
+      });
+
+      // Récupération du retour IA du backend
+      const coachMessage =
+        response.data?.message || "Pesée enregistrée avec succès !";
+
+      // Mise à jour optimiste et immédiate de l'affichage
+      setProfileData((prev) => ({
+        ...prev,
+        currentWeight: weightValue,
+      }));
       setNewWeight("");
+
+      // Affichage du commentaire du coach dans l'alerte
+      showAlert("Avis du Coach 🥊", coachMessage);
+
+      // Re-fetch en tâche de fond pour synchroniser
       fetchProfile();
     } catch (error) {
       console.error("Erreur poids:", error);

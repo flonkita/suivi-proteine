@@ -3,7 +3,7 @@ import prisma from "../config/db.js";
 import { analyzeWeightProgress } from "../services/ai.service.js";
 
 // Fonction utilitaire pour récupérer le profil via le badge du téléphone
-const getProfileFromDevice = async (req: Request, res: Response) => {
+export const getProfileFromDevice = async (req: Request, res: Response) => {
   const deviceId = req.headers["x-device-id"] as string;
   if (!deviceId) return null;
   return await prisma.userProfile.findUnique({ where: { deviceId } });
@@ -197,14 +197,13 @@ export const updateWeight = async (req: Request, res: Response) => {
     const { weight } = req.body;
 
     if (typeof weight !== "number") {
-      return res
-        .status(400)
-        .json({
-          status: "error",
-          message: "Le poids doit être un nombre valide.",
-        });
+      return res.status(400).json({
+        status: "error",
+        message: "Le poids doit être un nombre valide.",
+      });
     }
 
+    // Récupération de la pesée précédente pour l'analyse IA
     const previousRecord = await prisma.dailyTracking.findFirst({
       where: {
         userProfileId: profile.id,
@@ -214,23 +213,34 @@ export const updateWeight = async (req: Request, res: Response) => {
       orderBy: { date: "desc" },
     });
 
+    // Génération du commentaire IA personnalisé
     const aiComment = await analyzeWeightProgress(
       weight,
-      previousRecord?.weight || null,
+      previousRecord?.weight || profile.startWeight || null,
       profile.targetWeight,
       profile.goal,
       profile.targetMonths,
     );
 
+    // 1. Enregistrement de la pesée du jour dans DailyTracking
     const updatedRecord = await prisma.dailyTracking.upsert({
       where: { date_userProfileId: { date: today, userProfileId: profile.id } },
       update: { weight: weight },
       create: { date: today, weight: weight, userProfileId: profile.id },
     });
 
-    res
-      .status(200)
-      .json({ status: "success", message: aiComment, data: updatedRecord });
+    // 2. Synchronisation du poids actuel sur le profil utilisateur
+    await prisma.userProfile.update({
+      where: { id: profile.id },
+      data: { currentWeight: weight },
+    });
+
+    // On renvoie le commentaire IA dans le message
+    res.status(200).json({
+      status: "success",
+      message: aiComment,
+      data: updatedRecord,
+    });
   } catch (error) {
     console.error("Erreur updateWeight:", error);
     res.status(500).json({ status: "error", message: "Erreur interne." });

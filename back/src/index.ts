@@ -12,6 +12,7 @@ import dailyRoutes from "./routes/daily.routes.js";
 import profileRoutes from "./routes/profile.routes.js";
 import groceryRoutes from "./routes/grocery.routes.js";
 import recipeRoutes from "./routes/recipe.routes.js";
+import fridgeRoutes from "./routes/fridge.routes.js";
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ app.use("/api/daily", dailyRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/grocery", groceryRoutes);
 app.use("/api/recipes", recipeRoutes);
+app.use("/fridge", fridgeRoutes);
 // Lancement du serveur
 app.listen(port, () => {
   console.log(

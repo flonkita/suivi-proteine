@@ -212,3 +212,92 @@ export const generateBudgetRecipe = async (
     .trim();
   return JSON.parse(cleanJson);
 };
+
+export const analyzeFridgeAndGenerateRecipe = async (
+  imageBuffer: Buffer,
+  mimeType: string,
+  userGoal: string,
+  mealType: string,
+  isTrainingDay: boolean,
+) => {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3.5-flash-lite",
+    generationConfig: {
+      temperature: 0.7,
+      responseMimeType: "application/json",
+    },
+  });
+
+  let nutritionRules = "";
+  if (userGoal === "ATHLETIC") {
+    nutritionRules = `Diète PRÉDATEUR stricte. Zéro sucre raffiné, zéro huile végétale. Priorité aux protéines brutes et légumes volumineux.`;
+  } else if (userGoal === "MUSCLE_GAIN") {
+    nutritionRules = `Prise de masse propre. Surplus contrôlé, glucides complexes denses autour de l'effort.`;
+  } else {
+    nutritionRules = `Équilibre global, satiété et contrôle calorique.`;
+  }
+
+  const prompt = `
+    Tu es un chef cuisinier et vulgarisateur scientifique expert en "Macro-Friendly Comfort Food" (dans la lignée d'Ethan Chlebowski, Panaceapalm, itzpmartin, kais_texier, healthleads et pleins d'autres).
+    L'utilisateur t'envoie une photo de l'intérieur de son réfrigérateur, de son placard ou de son plan de travail.
+
+    Contexte :
+    - Repas : "${mealType}"
+    - Profil : ${nutritionRules}
+    - Contexte : ${isTrainingDay ? "JOUR D'ENTRAÎNEMENT 🏀 (besoin d'énergie et de protéines massives)" : "JOUR DE REPOS 🛋️ (focus volume maximal et déficit)"}
+
+    ### MISSION CULINAIRE & SCIENTIFIQUE :
+    1. **Détection :** Identifie tous les ingrédients exploitables visibles sur la photo.
+    2. **Recette Zéro Gaspi :** Conçois UNE recette réalisable avec ces ingrédients (en supposant que l'eau, le sel, le poivre et les épices de base sont disponibles).
+    3. **Techniques de cuisson obligatoires :**
+       - **Oignons fondus :** Si un oignon est utilisé, toujours prescrire de le faire suer/compoter à feu doux avec 2 cuillères à soupe d'eau pour libérer les sucres naturels sans aucune matière grasse.
+       - **Viandes maigres :** Saisie vive pour la réaction de Maillard, puis déglaçage (eau, sauce soja, vinaigre) pour récupérer les sucs caramélisés sans gras.
+       - **Sauces légères :** Lier avec du fromage blanc 0 %, du skyr ou une réduction d'aromates hors du feu.
+    4. **Règles d'or :**
+       - Les œufs sont TOUJOURS consommés entiers.
+       - Maximise le volume (fibres, eau) pour saturer la faim.
+       - Budget maîtrisé (Lidl/Aldi/Leclerc) sous 3,50 € la portion.
+
+    Renvoie UNIQUEMENT un objet JSON strictement conforme à cette structure :
+    {
+      "detectedIngredients": ["Poulet", "Courgette", "Oignon", "Moutarde"],
+      "recipe": {
+        "title": "Nom accrocheur avec émoji (ex: 🔥 Poulet Poêlé aux Oignons Fondus & Courgettes)",
+        "estimatedPrice": "💶 Environ X.XX€ la portion",
+        "prepTime": "Temps total (ex: 20 min)",
+        "volumeScore": "Élevé | Très élevé",
+        "calories": 490,
+        "protein": 50,
+        "carbs": 35,
+        "fats": 10,
+        "ingredients": [
+          "200g Blanc de poulet cru émincé",
+          "1 Oignon émincé",
+          "1 Courgette en rondelles",
+          "1 c.à.s de Moutarde de Dijon"
+        ],
+        "instructions": [
+          "1. Faire suer l'oignon émincé à feu moyen avec 2 c.à.s d'eau jusqu'à obtenir des oignons fondus sans huile.",
+          "2. Ajouter le poulet émincé à feu vif pour créer une réaction de Maillard, puis déglacer avec un fond d'eau.",
+          "3. Ajouter la courgette, couvrir 5 minutes à feu doux, puis lier avec la moutarde hors du feu."
+        ],
+        "cookingTechniqueTip": "Astuce technique (ex: Le déglaçage à l'eau décolle les sucs de cuisson concentrés sans ajouter d'huile)."
+      }
+    }
+  `;
+
+  const imagePart = {
+    inlineData: {
+      data: imageBuffer.toString("base64"),
+      mimeType: mimeType,
+    },
+  };
+
+  const result = await model.generateContent([prompt, imagePart]);
+  const cleanJson = result.response
+    .text()
+    .replace(/```json|```/g, "")
+    .trim();
+
+  return JSON.parse(cleanJson);
+};
