@@ -18,6 +18,7 @@ model UserProfile {
   id           String   @id @default(uuid())
   deviceId     String   @unique // NOUVEAU : Le badge unique du téléphone
   startWeight  Float
+  currentWeight Float?
   name         String?
   targetWeight Float
   targetMonths Int      @default(4)

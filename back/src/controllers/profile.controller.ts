@@ -70,8 +70,9 @@ export const updateProfile = async (req: Request, res: Response) => {
       create: {
         deviceId,
         name: parsedData.name ?? "Athlète",
-        startWeight: parsedData.startWeight ?? 125.0,
-        targetWeight: parsedData.targetWeight ?? 95.0,
+        startWeight: parsedData.startWeight ?? 120.0,
+        currentWeight: parsedData.startWeight ?? 120.0,
+        targetWeight: parsedData.targetWeight ?? 90.0,
         targetMonths: parsedData.targetMonths ?? 4,
         goal: parsedData.goal ?? "GENERAL_HEALTH",
       },

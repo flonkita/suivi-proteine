@@ -190,10 +190,10 @@ export const generateBudgetRecipe = async (
     ${breakfastOverride}
     
     RÈGLES ABSOLUES POUR FORCER LA DIVERSITÉ ET LE STYLE :
-    1. CONCEPTS & SAUCES : Alterne entre "Fakeaways" (Nuggets croustillants au Air Fryer, Wraps, Tacos Bowls), plats de "Flemme étudiante" (Thon/Fromage blanc, Haricots verts/Pilons), et des repas de récupération massifs (ex: Pommes de terre sautées + Viande hachée + Œufs). N'hésite pas à proposer des sauces maison (fromage blanc/moutarde/sriracha).
-    2. LES ŒUFS (RÈGLE D'OR) : Le client mange TOUJOURS ses œufs ENTIERS. Ne propose JAMAIS de jeter les jaunes ou d'utiliser des blancs d'œufs en bouteille ! Tout est bon dans l'œuf.
-    3. VARIE LES PROTÉINES : Utilise du Poulet, de la Dinde, du Thon, des Œufs, du Bœuf haché. (Ne fais pas toujours des "Smash Burgers" !).
-    4. PETIT-DÉJEUNER : Reste sur du classique matinal (œufs entiers, avoine, fromage blanc).
+    1. CONCEPTS & SAUCES : Alterne entre "Fakeaways" (Nuggets croustillants au Air Fryer, Wraps, Tacos Bowls), plats de "Flemme étudiante" (Thon/Fromage blanc, Haricots verts/Pilons), et des repas de récupération massifs.
+    2. RÈGLE STRICTE DIÈTE SCORPS : INTERDICTION ABSOLUE D'UTILISER DES OIGNONS SOUS TOUTES LEURS FORMES. ZÉRO OIGNON.
+    3. LES ŒUFS (RÈGLE D'OR) : Le client mange TOUJOURS ses œufs ENTIERS. Ne propose JAMAIS de jeter les jaunes !
+    4. VARIE LES PROTÉINES : Poulet, Dinde, Thon, Œufs, Bœuf haché. 
     5. BUDGET : Calcule un prix réaliste PAR PORTION (entre 1.50€ et 4.00€ maximum).
     
     Renvoie UNIQUEMENT un JSON avec :
@@ -250,9 +250,9 @@ export const analyzeFridgeAndGenerateRecipe = async (
     1. **Détection :** Identifie tous les ingrédients exploitables visibles sur la photo.
     2. **Recette Zéro Gaspi :** Conçois UNE recette réalisable avec ces ingrédients (en supposant que l'eau, le sel, le poivre et les épices de base sont disponibles).
     3. **Techniques de cuisson obligatoires :**
-       - **Oignons fondus :** Si un oignon est utilisé, toujours prescrire de le faire suer/compoter à feu doux avec 2 cuillères à soupe d'eau pour libérer les sucres naturels sans aucune matière grasse.
+       - **RÈGLE DIÈTE SCORPS :** Exclure totalement et absolument les oignons de la recette, même s'ils sont visibles sur la photo.
        - **Viandes maigres :** Saisie vive pour la réaction de Maillard, puis déglaçage (eau, sauce soja, vinaigre) pour récupérer les sucs caramélisés sans gras.
-       - **Sauces légères :** Lier avec du fromage blanc 0 %, du skyr ou une réduction d'aromates hors du feu.
+       - **Sauces légères :** Lier avec du fromage blanc 0 %, du skyr ou un déglaçage hors du feu.
     4. **Règles d'or :**
        - Les œufs sont TOUJOURS consommés entiers.
        - Maximise le volume (fibres, eau) pour saturer la faim.
