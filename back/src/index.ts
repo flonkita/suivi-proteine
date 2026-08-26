@@ -37,7 +37,7 @@ app.use("/api/daily", dailyRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/grocery", groceryRoutes);
 app.use("/api/recipes", recipeRoutes);
-app.use("/fridge", fridgeRoutes);
+app.use("/api/fridge", fridgeRoutes);
 // Lancement du serveur
 app.listen(port, () => {
   console.log(

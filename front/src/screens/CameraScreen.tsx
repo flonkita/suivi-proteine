@@ -164,8 +164,11 @@ export default function CameraScreen() {
           setFridgeResult(response.data.data);
         }
       }
-    } catch (error) {
-      console.error("Erreur d'analyse :", error);
+    } catch (error: any) {
+      // 👇 ON AJOUTE CES DEUX LIGNES POUR TOUT VOIR DANS LE TERMINAL
+      console.error("🚨 ERREUR COMPLÈTE :", error);
+      console.error("🚨 RÉPONSE DU SERVEUR :", error.response?.data);
+
       showAlert("Erreur", "Le coach n'a pas pu analyser cette image.");
     } finally {
       setLoading(false);
