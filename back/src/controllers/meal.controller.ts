@@ -105,3 +105,71 @@ export const deleteMeal = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const addManualMeal = async (req: Request, res: Response) => {
+  try {
+    const deviceId = req.headers["x-device-id"] as string;
+    if (!deviceId) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "DeviceId manquant." });
+    }
+
+    const profile = await prisma.userProfile.findUnique({
+      where: { deviceId },
+    });
+    if (!profile) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Profil introuvable." });
+    }
+
+    // On récupère les infos envoyées par le bouton du téléphone
+    const {
+      name,
+      calories,
+      protein,
+      carbs,
+      fats,
+      type = "DEJEUNER",
+    } = req.body;
+
+    const mealTypeMapper: Record<string, MealType> = {
+      "PETIT-DEJ": "PETIT_DEJEUNER",
+      DEJEUNER: "DEJEUNER",
+      COLLATION: "COLLATION",
+      DINER: "DINER",
+    };
+    const prismaMealType = mealTypeMapper[type] || "DEJEUNER";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // On s'assure que la journée existe
+    const dailyRecord = await prisma.dailyTracking.upsert({
+      where: { date_userProfileId: { date: today, userProfileId: profile.id } },
+      update: {},
+      create: { date: today, userProfileId: profile.id },
+    });
+
+    // On crée l'assiette sans passer par l'IA
+    const newMeal = await prisma.meal.create({
+      data: {
+        type: prismaMealType,
+        foodItems: name || "Recette du Chef",
+        calories: calories || 0,
+        protein: protein || 0,
+        carbs: carbs || 0,
+        fats: fats || 0,
+        isCompliant: true, // Si le Chef IA l'a proposé, c'est validé pour la diète
+        dailyTrackingId: dailyRecord.id,
+        comment: "Recette cuisinée directement depuis le frigo ! 🔥",
+      },
+    });
+
+    res.status(201).json({ status: "success", data: newMeal });
+  } catch (error) {
+    console.error("Erreur addManualMeal:", error);
+    res.status(500).json({ status: "error", message: "Erreur interne." });
+  }
+};

@@ -354,6 +354,48 @@ export default function CameraScreen() {
                         </Text>
                       </View>
                     )}
+
+                    {/* BOUTON AJOUTER AU JOURNAL */}
+                    <TouchableOpacity
+                      className="bg-emerald-500 w-full py-4 rounded-xl items-center flex-row justify-center mt-4 shadow-sm"
+                      onPress={async () => {
+                        try {
+                          const response = await api.post("/meals/manual", {
+                            name: fridgeResult.recipe.title,
+                            calories: fridgeResult.recipe.calories,
+                            protein: fridgeResult.recipe.protein,
+                            carbs: fridgeResult.recipe.carbs,
+                            fats: fridgeResult.recipe.fats,
+                            type: selectedType,
+                          });
+
+                          if (response.data.status === "success") {
+                            showAlert(
+                              "Opération réussie 🎯",
+                              `Boom ! ${fridgeResult.recipe.protein}g de protéines ajoutées à ton journal.`,
+                            );
+                            resetScanner();
+                          }
+                        } catch (error) {
+                          console.error("Erreur ajout manuel", error);
+                          showAlert(
+                            "Erreur",
+                            "Impossible d'enregistrer le repas dans ton journal.",
+                          );
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={22}
+                        color="white"
+                        className="mr-2"
+                      />
+                      <Text className="text-white font-bold text-base">
+                        Manger ce repas (+{fridgeResult.recipe?.protein}g Prot)
+                      </Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       className="bg-neutral-800 w-full py-3.5 rounded-xl items-center flex-row justify-center mt-3 shadow-sm"
                       onPress={resetScanner}
