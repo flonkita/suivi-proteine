@@ -271,13 +271,12 @@ export default function CameraScreen() {
                         </Text>
                       </View>
                     </View>
-
                     {/* Ingrédients détectés */}
                     <Text className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
                       Aliments repérés dans ton frigo
                     </Text>
                     <View className="flex-row flex-wrap gap-1.5 mb-4">
-                      {fridgeResult.detectedIngredients.map((item, idx) => (
+                      {fridgeResult.detectedIngredients?.map((item, idx) => (
                         <View
                           key={idx}
                           className="bg-neutral-100 px-2.5 py-1 rounded-lg"
@@ -288,7 +287,6 @@ export default function CameraScreen() {
                         </View>
                       ))}
                     </View>
-
                     {/* Macros */}
                     <View className="flex-row justify-between bg-neutral-900 rounded-2xl p-3 mb-4">
                       <View className="items-center flex-1">
@@ -324,22 +322,20 @@ export default function CameraScreen() {
                         </Text>
                       </View>
                     </View>
-
                     {/* Ingrédients & proportions */}
                     <Text className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
                       Ingrédients nécessaires
                     </Text>
-                    {fridgeResult.recipe.ingredients.map((ing, idx) => (
+                    {fridgeResult.recipe?.ingredients?.map((ing, idx) => (
                       <Text key={idx} className="text-sm text-neutral-700 mb-1">
                         • {ing}
                       </Text>
                     ))}
-
                     {/* Instructions */}
                     <Text className="text-xs font-bold text-neutral-400 uppercase tracking-wider mt-3 mb-2">
                       Préparation & Cuisson
                     </Text>
-                    {fridgeResult.recipe.instructions.map((step, idx) => (
+                    {fridgeResult.recipe?.instructions?.map((step, idx) => (
                       <Text
                         key={idx}
                         className="text-sm text-neutral-600 mb-2 leading-5"
@@ -347,7 +343,6 @@ export default function CameraScreen() {
                         {step}
                       </Text>
                     ))}
-
                     {/* Astuce Technique */}
                     {fridgeResult.recipe.cookingTechniqueTip && (
                       <View className="bg-orange-50 border border-orange-200 rounded-xl p-3 my-3">
@@ -359,7 +354,6 @@ export default function CameraScreen() {
                         </Text>
                       </View>
                     )}
-
                     <TouchableOpacity
                       className="bg-neutral-800 w-full py-3.5 rounded-xl items-center flex-row justify-center mt-3 shadow-sm"
                       onPress={resetScanner}

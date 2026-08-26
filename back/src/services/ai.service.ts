@@ -3,6 +3,27 @@ import "dotenv/config";
 
 const genAI = new GoogleGenerativeAI(String(process.env.GEMINI_API_KEY));
 
+// Fonction utilitaire pour extraire de force le JSON d'une réponse texte
+const extractValidJSON = (responseText: string) => {
+  try {
+    // 1. On cherche le premier "{" ou "[" et le dernier "}" ou "]"
+    const startIndex = responseText.indexOf("{");
+    const endIndex = responseText.lastIndexOf("}");
+    
+    if (startIndex !== -1 && endIndex !== -1) {
+      const jsonString = responseText.substring(startIndex, endIndex + 1);
+      return JSON.parse(jsonString);
+    }
+    
+    // 2. Fallback classique si ça foire
+    const cleanStr = responseText.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleanStr);
+  } catch (error) {
+    console.error("🚨 L'IA a renvoyé un format illisible :", responseText);
+    throw new Error("Format IA invalide");
+  }
+};
+
 export const analyzeMealImage = async (
   imageBuffer: Buffer,
   mimeType: string,
@@ -12,7 +33,7 @@ export const analyzeMealImage = async (
   userGoal: string,
 ) => {
   const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
-
+  
   let coachPersona = "";
   let nutritionRules = "";
 
@@ -67,11 +88,7 @@ export const analyzeMealImage = async (
   };
 
   const result = await model.generateContent([promptComplet, imagePart]);
-  const cleanJson = result.response
-    .text()
-    .replace(/```json|```/g, "")
-    .trim();
-  return JSON.parse(cleanJson);
+  return extractValidJSON(result.response.text());
 };
 
 export const analyzeWeightProgress = async (
@@ -144,11 +161,7 @@ export const analyzeGroceryImage = async (
   };
 
   const result = await model.generateContent([prompt, imagePart]);
-  const cleanJson = result.response
-    .text()
-    .replace(/```json|```/g, "")
-    .trim();
-  return JSON.parse(cleanJson);
+  return extractValidJSON(result.response.text());
 };
 
 export const generateBudgetRecipe = async (
@@ -206,11 +219,7 @@ export const generateBudgetRecipe = async (
   `;
 
   const result = await model.generateContent(prompt);
-  const cleanJson = result.response
-    .text()
-    .replace(/```json|```/g, "")
-    .trim();
-  return JSON.parse(cleanJson);
+  return extractValidJSON(result.response.text());
 };
 
 export const analyzeFridgeAndGenerateRecipe = async (
@@ -294,10 +303,5 @@ export const analyzeFridgeAndGenerateRecipe = async (
   };
 
   const result = await model.generateContent([prompt, imagePart]);
-  const cleanJson = result.response
-    .text()
-    .replace(/```json|```/g, "")
-    .trim();
-
-  return JSON.parse(cleanJson);
+  return extractValidJSON(result.response.text());
 };

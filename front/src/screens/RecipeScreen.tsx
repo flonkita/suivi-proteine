@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import api from "../services/api";
+import CustomAlert from "../components/CustomAlert"; // 👈 IMPORT AJOUTÉ
 
 const MEAL_OPTIONS = ["Petit-Déjeuner", "Déjeuner", "Collation", "Dîner"];
 
@@ -30,6 +31,18 @@ export default function RecipeScreen() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // --- ÉTATS POUR LE CUSTOM ALERT ---
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+  // -------------------------------------------
+
   const fetchRecipe = async () => {
     setLoading(true);
     setRecipe(null);
@@ -37,11 +50,19 @@ export default function RecipeScreen() {
       const response = await api.post("/recipes/generate", {
         mealType: selectedMeal,
       });
-      if (response.data.status === "success") {
+
+      // Sécurité : on vérifie que les données existent vraiment
+      if (response.data.status === "success" && response.data.data?.title) {
         setRecipe(response.data.data);
+      } else {
+        showAlert("Oups", "Le Chef IA a raté sa cuisson. Réessaie !");
       }
     } catch (error) {
       console.error("Erreur recette", error);
+      showAlert(
+        "Erreur Réseau",
+        "Impossible de joindre le Chef IA. Le serveur chauffe peut-être !",
+      );
     } finally {
       setLoading(false);
     }
@@ -111,12 +132,11 @@ export default function RecipeScreen() {
           <View className="bg-white rounded-3xl p-5 mb-10 shadow-sm elevation-md">
             <View className="flex-row justify-between items-start mb-3">
               <Text className="text-xl font-black text-neutral-800 flex-1 mr-2">
-                {recipe.title}
+                {recipe.title || "Recette Inconnue"}
               </Text>
-              {/* LE BADGE DE PRIX */}
               <View className="bg-green-100 px-3 py-1.5 rounded-lg border border-green-200">
                 <Text className="text-green-700 font-bold text-sm">
-                  💶 {recipe.estimatedPrice}
+                  💶 {recipe.estimatedPrice || "Inconnu"}
                 </Text>
               </View>
             </View>
@@ -124,11 +144,11 @@ export default function RecipeScreen() {
             <View className="flex-row items-center mb-4 pb-4 border-b border-neutral-100">
               <Ionicons name="time-outline" size={18} color="#666" />
               <Text className="text-neutral-500 text-sm ml-1 mr-4">
-                {recipe.prepTime}
+                {recipe.prepTime || "-"}
               </Text>
               <Ionicons name="flame-outline" size={18} color="#FF4500" />
               <Text className="text-neutral-500 text-sm ml-1">
-                {recipe.calories} kcal
+                {recipe.calories || 0} kcal
               </Text>
             </View>
 
@@ -137,42 +157,46 @@ export default function RecipeScreen() {
               <View className="items-center">
                 <Text className="text-orange-500 font-bold">Protéines</Text>
                 <Text className="font-black text-neutral-800">
-                  {recipe.protein}g
+                  {recipe.protein || 0}g
                 </Text>
               </View>
               <View className="items-center">
                 <Text className="text-teal-500 font-bold">Glucides</Text>
                 <Text className="font-black text-neutral-800">
-                  {recipe.carbs}g
+                  {recipe.carbs || 0}g
                 </Text>
               </View>
               <View className="items-center">
                 <Text className="text-purple-500 font-bold">Lipides</Text>
                 <Text className="font-black text-neutral-800">
-                  {recipe.fats}g
+                  {recipe.fats || 0}g
                 </Text>
               </View>
             </View>
 
-            {/* INGRÉDIENTS */}
+            {/* INGRÉDIENTS (Sécurisé avec ?.) */}
             <Text className="font-black text-neutral-800 text-lg mb-2">
               Panier (Eco)
             </Text>
             <View className="mb-5">
-              {recipe.ingredients.map((ing, idx) => (
+              {recipe.ingredients?.map((ing, idx) => (
                 <View key={idx} className="flex-row items-center mb-1.5">
                   <View className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-2" />
                   <Text className="text-neutral-600 flex-1">{ing}</Text>
                 </View>
-              ))}
+              )) || (
+                <Text className="text-neutral-500">
+                  Aucun ingrédient détaillé.
+                </Text>
+              )}
             </View>
 
-            {/* PRÉPARATION */}
+            {/* PRÉPARATION (Sécurisé avec ?.) */}
             <Text className="font-black text-neutral-800 text-lg mb-2">
               Préparation
             </Text>
             <View>
-              {recipe.instructions.map((step, idx) => (
+              {recipe.instructions?.map((step, idx) => (
                 <View key={idx} className="flex-row mb-3">
                   <Text className="font-black text-orange-500 mr-2">
                     {idx + 1}.
@@ -181,11 +205,23 @@ export default function RecipeScreen() {
                     {step}
                   </Text>
                 </View>
-              ))}
+              )) || (
+                <Text className="text-neutral-500">
+                  Pas d'instructions fournies.
+                </Text>
+              )}
             </View>
           </View>
         )}
       </ScrollView>
+
+      {/* 👈 NE PAS OUBLIER LE COMPOSANT ALERT */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }

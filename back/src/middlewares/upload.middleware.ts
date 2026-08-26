@@ -6,7 +6,7 @@ const storage = multer.memoryStorage();
 export const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // Limite à 5 Mo pour la photo de l'assiette
+    fileSize: 15 * 1024 * 1024, // Limite à 15 Mo pour les placards et le frigo
   },
   fileFilter: (req, file, cb) => {
     // On n'accepte que les images
